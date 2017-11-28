@@ -2,4 +2,5 @@ raw/*
 out/*
 .DS_Store
 __pycache__
-Sen_Legend.json
+_Sen_Legend.json
+_Ner_Legend.json

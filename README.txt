@@ -18,6 +18,7 @@ Total number of admissible advisor queries: 2920
 
 A json file containing:
 	'Sen_Legend' : a dictionary that maps sentence ids to sentence strings
+	'Ner_Legend' : a dictionary that maps sentence ids to ner output
 	'Set_Examples' : a list of examples (see below)
 
 To reduce file size, sentence strings are encoded by their ids, and can be

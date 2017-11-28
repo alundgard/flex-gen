@@ -9,6 +9,7 @@ import math
 import copy
 import random
 import pprint
+import pickle
 import hashlib
 import params as p
 import operator as op
@@ -16,7 +17,9 @@ import operator as op
 #===============================================================================
 # GLOBALS & PARAMS
 
-LEGEND = {} # Stores sentence id to sentence mapping
+SEN_LEGEND = {} # Stores sentence id to sentence mapping
+NER_LEGEND = {} # Stores sentence id to ner output mapping
+NER_LOOKUP = {} # Loads ner pickle
 SET_ALREADY = [] # Stores examples already generated
 ALL_DLOGS = [] # Stores all dialogs
 
@@ -211,8 +214,8 @@ def generate_example(_type, _train_idx):
 	# generate bag of paraphrases size PARA_BAG_SZ
 	pb = fill_bag_size_N(gt, di, _train_idx)
 
-	# sort by para (so correct do not occur at same position)
-	pb = sorted(pb, key=lambda k: k['paraId'])
+	# shuffle para bag
+	random.shuffle(pb)
 
 	'''
 	print('-----------------------------------------------------------')
@@ -262,11 +265,11 @@ def generate_set(_tt, _tt_idx):
 			# save it
 			new = json.loads(new_example)
 			GEN_SET = GEN_SET + [new]
-			
+
 			# show progress
 			sys.stdout.write("Num examples generated: %d\r" % (len(GEN_SET)))
 			sys.stdout.flush()
-	
+
 	print('\n') # for pretty output
 
 	# save it
@@ -353,7 +356,8 @@ def save_set(_tt, _GEN_SET):
 	# print('Size of set: ', len(_GEN_SET))
 	print('Saving as', name)
 	OUT = {
-		"Sen_Legend" : LEGEND,
+		"Sen_Legend" : SEN_LEGEND,
+		"Ner_Legend" : NER_LEGEND,
 		"Set_Examples" : _GEN_SET
 	}
 	with open(SAVE_PATH + name, 'w') as outfile:
@@ -361,21 +365,51 @@ def save_set(_tt, _GEN_SET):
 	return
 
 #===============================================================================
-# generates LEGEND dict key = sentenceId, value = sentenceString
-def generate_legend():
-	global LEGEND
+# generates SEN_LEGEND dict key = sentenceId, value = sentenceString
+def generate_sen_legend():
+	global SEN_LEGEND
 
 	for dlog in ALL_DLOGS:
 		for d in dlog['content']:
-			assert(d['oriSenId'] not in LEGEND)
-			LEGEND[d['oriSenId']] = d['oriSen']
+			assert(d['oriSenId'] not in SEN_LEGEND)
+			SEN_LEGEND[d['oriSenId']] = d['oriSen']
 			for p in d['paraphrases']:
-				assert(p['paraId'] not in LEGEND)
-				LEGEND[p['paraId']] = p['para']
+				assert(p['paraId'] not in SEN_LEGEND)
+				SEN_LEGEND[p['paraId']] = p['para']
 	# pprint.pprint(LEGEND)
-	with open(SAVE_PATH + '/../Sen_Legend.json', 'w') as outfile:
-	    json.dump(LEGEND, outfile, indent=4, separators=(',', ': '))
+	with open(SAVE_PATH + '/../_Sen_Legend.json', 'w') as outfile:
+	    json.dump(SEN_LEGEND, outfile, indent=4, separators=(',', ': '))
 	return
+
+#===============================================================================
+# generates NER_LEGEND dict key = sentenceId, value = nerOutput
+def generate_ner_legend():
+	global NER_LEGEND
+	load_ner_lookup()
+	for key, value in SEN_LEGEND.items():
+		NER_LEGEND[key] = (lookup_ner(value))
+	with open(SAVE_PATH + '/../_Ner_Legend.json', 'w') as outfile:
+	    json.dump(NER_LEGEND, outfile, indent=4, separators=(',', ': '))
+	return
+
+#===============================================================================
+# 
+def load_ner_lookup():
+	global NER_LOOKUP
+	with open(RAW_DAT_PATH + 'ner_lookup.pkl', 'rb') as f:
+		NER_LOOKUP = pickle.load(f)
+	return
+
+#===============================================================================
+# 
+def lookup_ner(text):
+    if text in NER_LOOKUP:
+        return NER_LOOKUP[text]
+    else:
+        return None, None, None, None, None
+
+#===============================================================================
+# generates LEGEND dict key = sentenceId, value = sentenceString
 
 #===============================================================================
 # removes sentence strings from ALL_DLOGS, keeps sentence ids
@@ -442,7 +476,8 @@ def start():
 		print('Requested test size: ', TEST_SET_SZ, ' Max possible: ', te_aq)
 		sys.exit()
 
-	generate_legend() # Fill in mapping
+	generate_sen_legend() # Fill in sen mapping
+	generate_ner_legend() # Fill in ner mapping
 	scrub_strings() # Get rid of strings
 
 	generate_set('Train', TRAIN_DOC_I) # Gen train
